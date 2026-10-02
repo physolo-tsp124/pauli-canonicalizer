@@ -12,6 +12,7 @@ sequences needed for existence, but leaves the construction of an explicit
 algorithm as a separate task.  Here that induction is converted into a
 concrete matrix algorithm which can be helpful in several problems such as
 gauging useful Lie Algebras for preparation of states in Implicit Quantum Control.  
+
 Graphs are stored as binary adjacency matrices, contractions become XOR column and row updates, 
 long certified contraction sequences are compiled into parity macros, and the evolving canonical graph is
 tracked by lightweight layout metadata.  Once a canonical family is found,
@@ -59,8 +60,7 @@ overwrites both files.
 
 ## Motivation and scope
 
-Let $\mathcal G=\{P_1,\ldots,P_q\}$ be a minimal set of Pauli generators and let $
-\mathfrak{g}=\langle P_1,\ldots,P_q, \ldots\rangle_{\mathrm{Lie}}$ be the corresponding Lie Algebra.
+Let $\mathcal G=\{P_1,\ldots,P_q\}$ be a minimal set of Pauli generators and let $\mathfrak{g}=\langle P_1,\ldots,P_q, \ldots\rangle_{\mathrm{Lie}}$ be the corresponding Lie Algebra.
 A direct calculation repeatedly forms commutators until no new Pauli operator
 appears.  This is useful for small examples, but it is not scalable: the number
 of basis elements can grow exponentially in $q$.
@@ -84,16 +84,16 @@ This implementation should be understood as an explicit realization of that
 proof strategy. The implementation layer developed here
 consists of:
 
-- a binary adjacency-matrix representation;
-- an XOR kernel for individual contractions;
+- a binary adjacency-matrix representation
+- an XOR kernel for individual contractions
 - a parity compiler for contraction sequences whose net effect has
-          already been proved;
-- a breadth-first search for the connected ordering;
+          already been proved
+- a breadth-first search for the connected ordering
 - explicit routines for the three lightning-reduction cases using clever transformation
-    tricks;
-- a direct sorting formulation for the type-$A$ case;
-- a finite-state reduction and constant-size lookup for the type-$B$
-          case; and
+    tricks
+- a direct sorting formulation for the type - $A$ case
+- a finite-state reduction and constant-size lookup for the type- $B$
+          case and
 - a canonical cleanup routine implementing the transformations in
           Appendix B of [1](#reference).
 
@@ -115,7 +115,7 @@ The full procedure is:
 1. Use breadth-first search to order the vertices as
     $v_1,\ldots,v_q$ so that every $v_{k+1}$ has a neighbour among
     $v_1,\ldots,v_k$.
-1. Initialize $v_1-v_2$ as a type-$A$ path.
+1. Initialize $v_1-v_2$ as a type - $A$ path.
 1. For $k=2,\ldots,q-1$, treat $V=v_{k+1}$ as a lightning on the
     current canonical graph: a processed vertex is lit precisely when it is
     adjacent to $V$.
@@ -136,12 +136,14 @@ algebra itself is never constructed.
 ### Anticommutation adjacency matrix
 
 The graph is represented by $A\in\mathbb{F}_2^{q\times q}$, where
+
 $$
 A_{ij}=\begin{cases}
 1,&\{P_i,P_j\}=0,\\
 0,&[P_i,P_j]=0.
 \end{cases}
 $$
+
 Thus $A=A^{\mathsf T}$ and $A_{ii}=0$.  Arithmetic on graph updates is over
 $\mathbb{F}_2$, so addition is XOR.
 
@@ -149,22 +151,26 @@ $\mathbb{F}_2$, so addition is XOR.
 
 Suppose $P_p$ and $P_t$ anticommute.  Contracting the source $p$ onto the
 target $t$ replaces
+
 $$
 P_t\longmapsto P'_t\propto[P_p,P_t]\propto P_pP_t.
 $$
+
 For any third generator $P_k$, the new commutation bit is
-$$
-A'_{kt}=A_{kt}\oplus A_{kp}.
-$$
-Symmetry gives $A'_{tk}=A'_{kt}$, while all entries not incident on $t$ remain
+
+$$A'_{kt}=A_{kt}\oplus A_{kp}$$
+
+Symmetry gives $`A'_{tk}=A'_{kt}`$, while all entries not incident on $t$ remain
 unchanged.  Therefore the implementation is simply
+
 $$
 A'_{:,t}=A_{:,t}\oplus A_{:,p},\qquad
 A'_{t,:}=(A'_{:,t})^{\mathsf T},\qquad A'_{tt}=0.
 $$
+
 The legality condition $A_{pt}=1$ is essential: the XOR identity describes the
 commutation pattern of a product even when the factors commute, but only an
-anticommuting pair produces that product through a nonzero Lie bracket.\\
+anticommuting pair produces that product through a nonzero Lie bracket.
 
 To simply put it, the net effect of contracting $P_p$ onto $P_t$, is (see Fig. 1):
 - a vertex connected to $P_p$ and $P_t$, is no longer connected to $P_t P_p$.
@@ -175,20 +181,24 @@ To simply put it, the net effect of contracting $P_p$ onto $P_t$, is (see Fig. 1
   <img src="docs/images/contraction.png" alt="Adjacency-graph update under a contraction" width="900">
 </p>
 
-*Adjacency-graph update under the contraction $P_t\mapsto P_pP_t$.*
+*Adjacency-graph update under the contraction $`P_t\mapsto P_pP_t`$.*
 
 ### Certified parity macros
 
 Many sequences in Appendix B of [1](#reference) modify the same target
 multiple times.  If a proved legal sequence has net effect
+
 $$
 P_t\longmapsto P_t\prod_{s\in S}P_s,
 $$
+
 then only the parity with which each source occurs matters.  The complete
 sequence can therefore be compiled to
+
 $$
 A'_{:,t}=A_{:,t}\oplus\bigoplus_{s\in S}A_{:,s}.
 $$
+
 The routine `apply_certified_macro` performs this update once and then
 copies the result to the target row.
 
@@ -223,10 +233,12 @@ The metadata object records one of the following layouts.
 - **Type $B3$**: The same star, together with exactly one length-three leg and no length-four
     leg.
 
-For a type-$B$ layout, a leg
+For a type - $B$ layout, a leg
+
 $$
 L=[L_1,L_2,\ldots,L_r]
 $$
+
 is stored from the center outward.  The center is denoted by $O$, and $\omega$
 denotes a chosen length-one leg.
 
@@ -235,18 +247,22 @@ denotes a chosen length-one leg.
 Because the input graph is connected, breadth-first search produces an order $v_1,v_2,\ldots,v_q$
 such that every prefix is connected.  Equivalently, for every $k>1$, the vertex
 $v_k$ has at least one neighbour in $\{v_1,\ldots,v_{k-1}\}$.  The first two
-vertices therefore form an edge and initialize a type-$A$ path.
+vertices therefore form an edge and initialize a type - $A$ path.
 
 Assume the first $k$ vertices have already been canonicalized.  For
 $V=v_{k+1}$ define its lightning on the active graph by
+
 $$
 x_u=A_{Vu},\qquad u\in\{v_1,\ldots,v_k\}.
 $$
+
 A vertex $u$ is called lit when $x_u=1$. Only lit vertices can be "toggled".  Contracting a lit vertex $u$ onto
 $V$ replaces $V$ by $VP_u$ and toggles exactly the neighbours of $u$:
+
 $$
 x\longmapsto x\oplus A_{:,u}.
 $$
+
 The contraction is legal precisely because $x_u=1$.  Theorem 4 of
 [1](#reference) guarantees that the lightning can be reduced to one lit
 vertex.  The following three sections make that reduction constructive.
@@ -269,6 +285,7 @@ $V$, however, the state of $g$ flips because $V$ anticommutes with $P$ and
 commutes with $Q$.
 
 The implementation compiles (B8) directly.  It first computes
+
 $$
 f=A_{:,P}\oplus A_{:,Q}.
 $$
@@ -279,9 +296,11 @@ $$
 
 The restriction of $f$ to the active vertices must vanish; this is a useful
 consistency check.  For every lit $g\neq P$, it then applies
+
 $$
 A_{:,g}\longmapsto A_{:,g}\oplus f.
 $$
+
 All active vertices except $P$ become unlit, while the internal canonical graph
 is unchanged.  Compared with replaying (B8) separately for each $g$, the macro
 uses one precomputed XOR vector.
@@ -292,11 +311,8 @@ Simply put, let $R$ be any generator outside the active canonical graph. Since $
     - $R$ commuting with both $P$ and $Q$;
     - $R$ anticommuting with both $P$ and $Q$.
 - If $R$ commutes with exactly one of $P,Q$ and anticommutes with the other, then its relation to $g$ is reversed:
-    $$
-    [R,g]=0
-    \quad\Longleftrightarrow\quad
-    \{R,g'\}=0.
-    $$
+  
+    $$[R,g]=0\quad\Longleftrightarrow\quad\{R,g'\}=0$$
 
 - In particular, $V$ anticommutes with $P$ and commutes with $Q$. Therefore, replacing $g$ by $gPQ$ reverses the state of $g$ relative to $V$. Every initially lit $g\neq P$ consequently becomes unlit.
 
@@ -305,9 +321,11 @@ The two matching contributions cancel modulo $2$, whereas one unmatched contribu
 ## Case 2: type $A$ with equal length-one states
 
 Let the stored path be
+
 $$
 L_1-L_2-\cdots-L_m,
 $$
+
 where the additional pendants, if present, attach at $L_2$.  Their states agree
 with the state of the representative length-one vertex $L_1$, so it suffices to
 work on the path.
@@ -316,33 +334,41 @@ While, at initial glance, coming up with a general toggling procedure seems tedi
 clever bijective mapping can be used to transform the problem into a linear sorting.
 
 Write
+
 $$
 x_i=A_{V,L_i}\in\mathbb{F}_2.
 $$
+
 Introduce $m+1$ auxiliary bits $y_0,\ldots,y_m$ by choosing the gauge $y_0=0$
 and defining
+
 $$
 y_i=y_{i-1}\oplus x_i,
 \qquad\text{equivalently}\qquad
 x_i=y_{i-1}\oplus y_i.
 $$
+
 Thus a lit path vertex is exactly a domain wall in $y$.  Toggling a legal
 $L_i$ flips $x_{i-1}$ and $x_{i+1}$, which in the $y$ representation is the
 adjacent transposition
+
 $$
 (y_{i-1},y_i)\longmapsto(y_i,y_{i-1}).
 $$
+
 The legality condition $x_i=1$ is exactly the condition
 $y_{i-1}\neq y_i$, so every swap used by the sorting interpretation is a legal
 toggle.
 
 Consequently, lightning reduction becomes binary partition.  Sort $y$
 to either
+
 $$
 11\cdots1100\cdots00
 \qquad\text{or}\qquad
 00\cdots0011\cdots11.
 $$
+
 The sorted sequence has one domain wall, hence the corresponding $x$ has exactly
 one lit vertex.  If there are pendants and only one $1$ in $y$, the
 zeros-first direction is selected so that the surviving domain wall does not
@@ -353,17 +379,19 @@ ones-first direction.
   <img src="docs/images/case2.png" alt="Case 2 binary sorting representation" width="900">
 </p>
 
-*Toggling a lit vertex $x_3$ is equivalent to swapping $y_{2}$ and $y_3$.*
+*Toggling a lit vertex $`x_3`$ is equivalent to swapping $`y_{2}`$ and $`y_3`$.*
 
 Only the parity of the swaps across each boundary is needed.  If a $1$ at
 position $i$ moves to position $r$, the boundaries $r,r+1,\ldots,i-1$ are
 toggled.  A strictly linear parity compiler records this interval using an XOR
 difference array,
+
 $$
 d_r\mathrel{\oplus}=1,
 \qquad
 d_i\mathrel{\oplus}=1,
 $$
+
 and obtains all boundary parities by one prefix XOR at the end.  This avoids
 storing the potentially quadratic list of adjacent swaps.  The target $V$ is
 then updated once using all path vertices whose final parity is odd.
@@ -385,9 +413,11 @@ is updated only once, after the final parity is known.
 If $O$ is already lit, do nothing.  If a length-one leg $\omega$ is lit,
 toggle $\omega$.  Otherwise choose a longer leg containing a lit vertex and
 let $L_j$ be the innermost lit vertex.  Toggle
+
 $$
 L_j,L_{j-1},\ldots,L_1.
 $$
+
 This propagates the lightning inward until $O$ becomes lit.  The implementation
 searches length-two legs first. If all are dark, only the exceptional
 length-three or length-four leg needs later normalization.
@@ -423,6 +453,7 @@ lightning is confined to the distinguished leg and the center.
 ### Stage 6: solve a constant-size path
 
 The remaining problem is one of the paths
+
 $$
 O-L_1-L_2,
 \qquad
@@ -430,6 +461,7 @@ O-L_1-L_2-L_3,
 \qquad
 O-L_1-L_2-L_3-L_4,
 $$
+
 with $O$ lit and $L_2$ dark.  There are only two relevant configurations for
 $B1$, four for $B3$, and eight for $B2$.  The implementation uses a verified
 lookup table of legal toggles for these constant-size cases.  The result is a
@@ -453,8 +485,8 @@ one certified macro.
 | $B2$ | $O-L_1-L_2-L_3-L_4$ | $(L_1,L_3,L_4)=(1,1,0)$ | $L_1,L_2$ | $L_2$ |
 | $B2$ | $O-L_1-L_2-L_3-L_4$ | $(L_1,L_3,L_4)=(1,1,1)$ | $L_1,L_2,L_4,L_3$ | $L_3$ |
 
-*Constant-size lookup table used in Stage 6. In every configuration, $O=1$ and
-$L_2=0$ initially. The listed toggles are applied from left to right.*
+*Constant-size lookup table used in Stage 6. In every configuration, $`O=1`$ and
+$`L_2=0`$ initially. The listed toggles are applied from left to right.*
 
 ## Canonical cleanup
 
@@ -465,9 +497,9 @@ graph must now be returned to canonical form.
 
 Several attachments require no nontrivial transformation:
 
-- extending the outer endpoint of a type-$A$ path preserves type $A$;
-- attaching $V$ to the type-$A$ center adds a pendant;
-- attaching $V$ to the center of a type-$B$ star adds a length-one leg;
+- extending the outer endpoint of a type - $A$ path preserves type $A$
+- attaching $V$ to the type - $A$ center adds a pendant
+- attaching $V$ to the center of a type - $B$ star adds a length-one leg
 
 ### Removing a second branching point
 
@@ -475,9 +507,11 @@ If $V$ attaches to an internal leg vertex, the enlarged graph has two branching
 points.  Equation (B9) moves the outward suffix back to the original center.
 In compiled form, if $L_{j+1}$ is the first vertex beyond the attachment point,
 the implementation applies
+
 $$
 L_{j+1}\longmapsto L_{j+1}\,\omega V.
 $$
+
 This removes the edge $L_j-L_{j+1}$ and creates the edge $O-L_{j+1}$.  The
 result is again a one-center star.
 
@@ -489,19 +523,18 @@ result is again a one-center star.
 
 The resulting star is normalized using Lemma 3 and equations (B2)--(B7):
 
-1. Every leg longer than four is split.  For
-    $L_1-\cdots-L_5-\cdots$, the compressed (B2) macro is
-    $$
-    L_5\longmapsto L_5L_1L_3.
-    $$
+1. Every leg longer than four is split.  For $L_1-\cdots-L_5-\cdots$, the compressed (B2) macro is
+
+    $$L_5\longmapsto L_5L_1L_3$$
+   
     This produces a length-four leg and a new remaining leg beginning at
     $L_5$; the operation repeats if the remainder is still too long.
 
 1. Repeated length-three legs are removed using (B3).  With length-three
     legs $L$ and $M$,
-    $$
-    L_3\longmapsto L_3L_1M_1M_3\omega.
-    $$
+   
+    $$L_3\longmapsto L_3L_1M_1M_3\omega$$
+   
     The leg $L$ becomes one length-two leg $(L_1,L_2)$ and one length-one leg
     $(L_3)$.
 
@@ -511,19 +544,12 @@ The resulting star is normalized using Lemma 3 and equations (B2)--(B7):
 1. If no length-three leg remains, pairs of length-four legs are reduced
     using (B4), followed by the two legal contractions (B5)--(B6) and a final
     Lemma-2 cleanup.  In the implementation this is represented by
-    $$
-    L_3\mapsto L_3L_1M_1,
-    \qquad
-    M_2\mapsto[M_2,M_1],
-    \qquad
-    O\mapsto[O,M_2],
-    \qquad
-    M_2\mapsto M_2L_4M_4.
-    $$
+   
+    $$L_3\mapsto L_3L_1M_1,\qquad M_2\mapsto[M_2,M_1], \qquad O\mapsto[O,M_2],\qquad M_2\mapsto M_2L_4M_4$$
 
 After these steps, the remaining leg lengths uniquely determine $B1$, $B2$, or
 $B3$.  If at most one nontrivial leg remains, the star is represented more
-simply as a type-$A$ path with pendants.
+simply as a type - $A$ path with pendants.
 
 ## Reading off the Lie algebra
 
@@ -541,11 +567,13 @@ let $n_2$ be the number of length-two legs.  Theorem 2 of
 The initial 100-vertex example is actually canonicalized to $B2$ with one length-one leg,
 47 length-two legs, and one length-four leg.  Thus $n_c=0$, $n_2=47$, and $\mathfrak{g}\cong\mathfrak{so}(2^{50}),$
 with
+
 $$
 \dim\mathfrak{g}
 =\frac{2^{50}(2^{50}-1)}{2}
 \approx 6.33 \times 10^{29}.
 $$
+
 This graph calculation completed in milliseconds, whereas an explicit basis
 enumeration would be physically infeasible.
 
@@ -564,7 +592,7 @@ path. The graph therefore remains type $A$ throughout canonicalization.
   <img src="docs/images/tfim-canonicalization-history.png" alt="Canonicalization of the transverse-field Ising model" width="900">
 </p>
 
-*Canonicalization of the five-qubit transverse-field Ising model. Every intermediate graph is of type $A$.*
+*Canonicalization of the five-qubit transverse-field Ising model. Every intermediate graph is of type $`A`$.*
 
 ### Arbitrary Anticommutation Graph
 
@@ -576,7 +604,7 @@ the final graph has canonical type $B3$.
   <img src="docs/images/random-30-canonicalization-history.png" alt="Canonicalization of a random connected graph" width="700">
 </p>
 
-*Canonicalization of a random connected graph on $30$ vertices (step = 2). Every second stage is shown; the final canonical graph is of type $B3$.*
+*Canonicalization of a random connected graph on $`30`$ vertices (step = 2). Every second stage is shown; the final canonical graph is of type $`B3`$.*
 
 ## Complexity
 
@@ -585,21 +613,19 @@ on the matrix costs $O(q^2)$.  The remaining routines perform scans of
 the active layout and XOR updates of matrix columns.  With the current
 representation, a conservative worst-case bound for the complete induction is
 $O(q^3)$ time and $O(q^2)$ space.  The local lightning logic is linear in the
-active graph size; the extra factor comes from applying global length-$q$
+active graph size; the extra factor comes from applying global length - $q$
 column updates across up to $q$ induction stages.
 
 There is substantial room for engineering improvement:
 
-- represent columns as packed bitsets so a length-$q$ XOR uses machine
-    words rather than scalar bytes;
-- use an XOR difference array in Case 2;
-- batch macro sources with a reduction operation;
-- process disconnected components independently.
+- represent columns as packed bitsets so a length - $q$ XOR uses machine
+    words rather than scalar bytes
+- use an XOR difference array in Case 2
+- batch macro sources with a reduction operation
+- process disconnected components independently
 
 The important point is that the running time is polynomial in the number of
-input generators, not in $\dim\mathfrak{g}$.  An explicit closure must spend at least
-$\Omega(\dim\mathfrak{g})$ time merely to enumerate a basis.
-
+input generators, not in $\dim\mathfrak{g}$.  
 ## Implementation map
 
 The main functions correspond to the mathematical stages as follows:
@@ -610,7 +636,7 @@ The main functions correspond to the mathematical stages as follows:
 | `contract` | Apply one legal source-to-target contraction |
 | `apply_certified_macro` | Apply the parity of a proved sequence |
 | `connected_vertex_order` | Construct the BFS induction order |
-| `initialize_two_vertices` | Build the initial type-$A$ edge |
+| `initialize_two_vertices` | Build the initial type - $A$ edge |
 | `reduce_mixed_length_one_lighting` | Case 1 / equation (B8) |
 | `reduce_type_a_same_lightning` | Case 2 / binary sorting |
 | `reduce_type_b_same_lightning` | Case 3 / six-stage reduction |
