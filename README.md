@@ -34,6 +34,11 @@ Install the package
 ```bash
 python -m pip install .
 ```
+Alternatively, 
+
+```bash
+python -m pip install pauli-canonicalizer
+```
 
 Python 3.10 or later is required. Only Numpy and Matplotlib were the additional modules used for this project.
 
