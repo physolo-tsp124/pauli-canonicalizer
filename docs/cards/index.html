@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The toggling game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a friendly puzzle card for a maths lecture theatre, quick to grasp on a phone.
+   IDEA: a string of lights on a path; tapping a lit one flips its neighbours, like the slides.
+   PICTURE: the path of white (lit) and navy (dark) lights, as large as the screen allows, with a tap counter.
+   COLOUR and TYPE: Imperial navy and white with one magenta accent; Lexend throughout.
+   LAYOUT: title, rules, level tabs, the path, status, controls; one column down to 360px. */
+:root{color-scheme:light dark;
+  --bg:light-dark(#ffffff,#0b0d2e);--ink:light-dark(#151633,#eef0ff);--muted:light-dark(#5d6080,#a9add6);
+  --navy:light-dark(#000080,#9fb0ff);--blue:light-dark(#0000cd,#7f93ff);--mag:#c71585;
+  --tint:light-dark(#e6ebff,#1a1f55);--card:light-dark(#f4f6ff,#131746);--edge:light-dark(#000080,#8fa0ff);
+  --ok:light-dark(#0b7a43,#58d68d);--bad:#c71585}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Lexend,system-ui,sans-serif;overflow-x:clip}
+main{max-width:900px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,14px) 40px}
+h1{font-size:clamp(26px,4.4vw,40px);line-height:1.05;margin:0 0 10px;color:var(--navy);text-wrap:balance}
+.rules{margin:0 0 14px;padding:12px 16px;border-radius:14px;background:var(--card)}
+.rules ol{margin:0;padding-left:1.3em}.rules li{margin:2px 0}
+.rules b{color:var(--navy)}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tabs button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:22px;border:2px solid var(--navy);background:transparent;color:var(--navy);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--navy);color:var(--bg)}
+.tabs .tick{color:var(--ok);margin-left:6px}.tabs button[aria-pressed=true] .tick{color:inherit}
+.meter{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:0 2px 6px}
+.meter .goal{color:var(--muted);font-size:15px}
+.meter .taps{font-weight:700;color:var(--navy);font-size:20px}
+.board{background:var(--card);border-radius:20px;padding:clamp(10px,2.5vw,22px) clamp(6px,2vw,18px)}
+.board svg{display:block;width:100%;height:auto;max-height:52vh;touch-action:manipulation;overflow:visible}
+.link{stroke:var(--edge);stroke-width:.5}
+.c{cursor:pointer}
+.c .face{stroke:var(--navy);stroke-width:.55;transition:fill .2s}
+.c.up .face{fill:#fff}
+.c.down .face{fill:var(--navy)}
+.c .num{font:600 2.3px Lexend,sans-serif;fill:var(--muted);text-anchor:middle}
+.c .flip{transform-box:fill-box;transform-origin:center}
+.c.flipping .flip{animation:flip .3s ease-out}
+@keyframes flip{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.c.nope .flip{animation:nope .3s}
+@keyframes nope{25%{transform:translateX(-.8px)}75%{transform:translateX(.8px)}}
+.c .ring{stroke:var(--mag);stroke-width:.55;fill:none}
+.c:focus{outline:none}.c:focus-visible .face{stroke:var(--mag);stroke-width:.9}
+@media (prefers-reduced-motion:reduce){.c.flipping .flip,.c.nope .flip,.status.ok{animation:none}}
+.status{min-height:56px;margin:12px 0 10px;padding:12px 14px;border-radius:14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.status.info{background:var(--card);color:var(--muted);font-weight:400}
+.status.ok{background:light-dark(#e3f7ec,#0f3324);color:var(--ok);animation:pop .35s ease-out}
+.status.warn{background:light-dark(#fde7f1,#3a1030);color:var(--bad)}
+@keyframes pop{from{transform:scale(.97);opacity:.4}to{transform:none;opacity:1}}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.controls button,.status button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--tint);color:var(--navy);cursor:pointer}
+.status button{background:var(--blue);color:#fff}
+button:focus-visible{outline:3px solid var(--mag);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.note{margin-top:16px;font-size:14px;color:var(--muted)}
+@media(max-width:600px){.controls button{flex:1 1 40%}}
+</style>
+</head>
+<body>
+<main>
+  <h1>The toggling game</h1>
+  <div class="rules">
+    <ol>
+      <li>You may only tap a <b>lit</b> (white) vertex.</li>
+      <li>Tapping it flips its <b>neighbours</b>: lit ↔ dark. The vertex you tapped stays lit.</li>
+      <li>You win when <b>exactly one</b> vertex is lit. Fewest taps wins.</li>
+    </ol>
+  </div>
+  <div class="tabs" id="tabs" role="group" aria-label="Level"></div>
+  <div class="meter"><span class="goal" id="goal"></span><span class="taps" id="taps">Taps: 0</span></div>
+  <div class="board"><svg id="svg" role="img" aria-label="A path of lights. Tap a lit vertex to flip its neighbours."></svg></div>
+  <div class="status info" id="status" role="status" aria-live="polite"></div>
+  <div class="controls">
+    <button id="undo">Undo</button>
+    <button id="restart">Restart level</button>
+  </div>
+  <p class="note">Same as the card game from the talk: lit = face up, dark = face down. The two end vertices have only one neighbour, so tapping one flips just one vertex.</p>
+</main>
+<script>
+{
+const LEVELS=[
+  {name:'Level 1',start:[1,0,0,1,1],min:3},
+  {name:'Level 2',start:[0,1,1,0,1,0,1],min:5},
+  {name:'Level 3',start:[0,0,1,0,1,0,0,1,1],min:9},
+  {name:'Level 4',start:[1,0,0,1,1,0,0,1,0,0,0,0,1],min:16}
+];
+const svg=document.getElementById('svg'),statusEl=document.getElementById('status'),tabsEl=document.getElementById('tabs');
+const tapsEl=document.getElementById('taps'),goalEl=document.getElementById('goal');
+const btnUndo=document.getElementById('undo'),btnRestart=document.getElementById('restart');
+let best={};
+try{best=JSON.parse(localStorage.getItem('toggle-best')||'{}')}catch(e){}
+let cur=0,x=[],hist=[],taps=0,done=false,lastTap=-1,flipped=[],nope=-1,msg='';
+
+function load(i){cur=i;x=LEVELS[i].start.slice();hist=[];taps=0;done=false;lastTap=-1;flipped=[];nope=-1;msg='';render()}
+function tap(i){
+  if(done)return;
+  if(!x[i]){nope=i;flipped=[];msg='You can only tap a lit (white) vertex.';render();return}
+  hist.push(x.slice());
+  flipped=[];
+  for(const j of [i-1,i+1]){if(j>=0&&j<x.length){x[j]^=1;flipped.push(j)}}
+  taps++;lastTap=i;nope=-1;msg='';
+  if(x.reduce((a,b)=>a+b,0)===1){
+    done=true;const L=LEVELS[cur];
+    if(!best[L.name]||taps<best[L.name]){best[L.name]=taps;try{localStorage.setItem('toggle-best',JSON.stringify(best))}catch(e){}}
+  }
+  render();
+}
+function renderTabs(){
+  tabsEl.innerHTML=LEVELS.map((L,i)=>`<button data-i="${i}" aria-pressed="${i===cur}">${L.name}${best[L.name]?'<span class="tick" aria-label="solved">✓</span>':''}</button>`).join('');
+}
+function render(){
+  renderTabs();
+  const n=x.length,P=9,r=3.6,RH=13;
+  const cols=(svg.clientWidth||innerWidth)<560&&n>7?Math.ceil(n/2):n, rows=Math.ceil(n/cols);
+  const pos=i=>{const row=Math.floor(i/cols);let c=i%cols;if(row%2)c=cols-1-c;return [c*P,5+row*RH];};
+  const m=rows>1?7.6:5;svg.setAttribute('viewBox',`${-m} 0 ${(cols-1)*P+2*m} ${rows*RH-1}`);
+  let s='';
+  for(let i=0;i+1<n;i++){const [x1,y1]=pos(i),[x2,y2]=pos(i+1);if(y1===y2){s+=`<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;}else{const d=x1>0?1:-1,e=x1+d*r,k=x1+d*(r+3.5);s+=`<path class="link" fill="none" d="M${e} ${y1} C${k} ${y1} ${k} ${y2} ${e} ${y2}"/>`;}}
+  for(let i=0;i<n;i++){
+    const [cx,cy]=pos(i), up=x[i]===1;
+    const cls=['c',up?'up':'down',flipped.includes(i)?'flipping':'',nope===i?'nope':''].join(' ');
+    s+=`<g class="${cls}" data-i="${i}" tabindex="0" role="button" aria-label="Vertex ${i+1}, ${up?'lit':'dark'}">`+
+       `<rect x="${cx-P/2}" y="${cy-5}" width="${P}" height="${RH-1}" fill="transparent"/>`+
+       (lastTap===i&&!done?`<circle class="ring" cx="${cx}" cy="${cy}" r="${r+1.1}"/>`:'')+
+       `<g class="flip"><circle class="face" cx="${cx}" cy="${cy}" r="${r}"/></g>`+
+       `<text class="num" x="${cx}" y="${cy+r+3}">${i+1}</text></g>`;
+  }
+  svg.innerHTML=s;
+  const L=LEVELS[cur], up=x.reduce((a,b)=>a+b,0);
+  tapsEl.textContent=`Taps: ${taps}`;
+  goalEl.textContent=`${up} lit · goal: exactly 1`;
+  if(done){
+    statusEl.className='status ok';
+    const star=taps===L.min?' That is the minimum. ★':` The minimum is ${L.min}. Can you match it?`;
+    statusEl.innerHTML=`<span>✓ Solved in ${taps} tap${taps===1?'':'s'}!${star}</span>`+
+      (cur<LEVELS.length-1?'<button id="next">Next level</button>':'')+(taps>L.min?'<button id="retry">Try again</button>':'');
+  }else if(msg){
+    statusEl.className='status warn';statusEl.textContent=msg;
+  }else{
+    statusEl.className='status info';
+    statusEl.textContent=taps===0?'Tap a lit vertex to begin.':`Keep going: ${up} vertices are lit.`;
+  }
+  btnUndo.disabled=hist.length===0||done;
+}
+svg.addEventListener('click',e=>{const g=e.target.closest('.c');if(g)tap(+g.dataset.i)});
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('.c');if(g){e.preventDefault();tap(+g.dataset.i)}}});
+tabsEl.addEventListener('click',e=>{const b=e.target.closest('button');if(b)load(+b.dataset.i)});
+btnUndo.addEventListener('click',()=>{if(hist.length&&!done){x=hist.pop();taps--;lastTap=-1;flipped=[];nope=-1;msg='';render()}});
+btnRestart.addEventListener('click',()=>load(cur));
+statusEl.addEventListener('click',e=>{if(e.target.id==='next')load(cur+1);if(e.target.id==='retry')load(cur)});
+load(0);
+}
+let _rw=innerWidth;addEventListener('resize',()=>{if((innerWidth<560)!==(_rw<560)){_rw=innerWidth;render();}});
+</script>
+</body>
+</html>
