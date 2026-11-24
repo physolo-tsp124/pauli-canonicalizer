@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which vertex next?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a friendly puzzle card for a maths lecture theatre, quick to grasp on a phone.
+   IDEA: the graph board is the game piece; your ordering builds up beneath it like a hand of cards.
+   PICTURE: the graph itself, large, at the top; chosen vertices carry their position number.
+   COLOUR and TYPE: Imperial navy and blue with one magenta accent on white; Lexend throughout.
+   LAYOUT: title, level tabs, board, your list, controls; one column that also works at 360px. */
+:root{color-scheme:light dark;
+  --bg:light-dark(#ffffff,#0b0d2e);--ink:light-dark(#151633,#eef0ff);--muted:light-dark(#5d6080,#a9add6);
+  --navy:light-dark(#000080,#9fb0ff);--blue:light-dark(#0000cd,#7f93ff);--mag:#c71585;
+  --tint:light-dark(#e6ebff,#1a1f55);--card:light-dark(#f4f6ff,#131746);--edge:light-dark(#000080,#8fa0ff);
+  --node:light-dark(#ffffff,#0b0d2e);--ok:light-dark(#0b7a43,#58d68d);--bad:#c71585}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Lexend,system-ui,sans-serif;overflow-x:clip}
+main{max-width:860px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,14px) 40px}
+h1{font-size:clamp(26px,4.4vw,40px);line-height:1.05;margin:0 0 6px;color:var(--navy);text-wrap:balance}
+.lead{margin:0 0 16px;color:var(--muted);max-width:62ch}
+.lead b{color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tabs button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:22px;border:2px solid var(--navy);background:transparent;color:var(--navy);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--navy);color:var(--bg)}
+.tabs button .tick{color:var(--ok);margin-left:6px}
+.tabs button[aria-pressed=true] .tick{color:inherit}
+.board{background:var(--card);border-radius:20px;padding:8px;position:relative}
+.board svg{display:block;width:100%;height:auto;aspect-ratio:100/70;max-height:62vh;touch-action:manipulation}
+.edge{stroke:var(--edge);stroke-width:.9;stroke-linecap:round;opacity:.85}
+.node circle.dot{fill:var(--node);stroke:var(--navy);stroke-width:.8;transition:fill .15s}
+.node text{font:700 4.2px Lexend,sans-serif;fill:var(--navy);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.node.picked circle.dot{fill:var(--navy)}.node.picked text{fill:var(--bg)}
+.node.start circle.dot{fill:var(--mag);stroke:var(--mag)}.node.start text{fill:#fff}
+.node .badge{fill:var(--mag)}.node .btxt{font-size:2.8px;fill:#fff}
+.node.hint circle.dot{stroke:var(--mag);stroke-width:1.2;stroke-dasharray:1.6 1}
+.node.badpick circle.dot{stroke:var(--bad);stroke-width:1.6}
+.node{cursor:pointer}.node:focus{outline:none}.node:focus-visible circle.dot{stroke:var(--mag);stroke-width:1.6}
+.list{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:52px;margin:14px 0 6px;padding:8px 10px;border:2px dashed var(--tint);border-radius:14px}
+.list .empty{color:var(--muted);font-size:14px}
+.chip{display:inline-block;padding:5px 11px;border-radius:10px;background:var(--tint);color:var(--navy);font-weight:700;white-space:nowrap;line-height:1.3}
+.chip .pk{font-weight:600}.chip sub{font-size:.7em;vertical-align:sub;line-height:0}
+.chip .col{margin:0 5px 0 2px;opacity:.7}
+.chip.first{background:var(--mag);color:#fff}
+.chip.bad{outline:2px solid var(--bad);background:light-dark(#fde7f1,#3a1030)}
+.sep{color:var(--muted)}
+.status{min-height:56px;margin:8px 0 10px;padding:12px 14px;border-radius:14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.status.info{background:var(--card);color:var(--muted);font-weight:400}
+.status.ok{background:light-dark(#e3f7ec,#0f3324);color:var(--ok)}
+.status.bad{background:light-dark(#fde7f1,#3a1030);color:var(--bad)}
+.status.ok{animation:pop .35s ease-out}
+@keyframes pop{from{transform:scale(.97);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.status.ok{animation:none}.node circle.dot{transition:none}}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.controls button,.status button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--tint);color:var(--navy);cursor:pointer}
+.controls button.primary,.status button{background:var(--blue);color:#fff}
+.controls button[aria-pressed=true]{background:var(--mag);color:#fff}
+button:focus-visible{outline:3px solid var(--mag);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.rule{margin-top:18px;font-size:14px;color:var(--muted)}
+@media(max-width:600px){.board{padding:2px}.controls button{flex:1 1 40%}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Which vertex comes next?</h1>
+  <p class="lead">The magenta vertex is your start. Tap the rest one at a time. <b>Every new vertex must be connected to at least one vertex already in your list.</b> When all are in, we check your list.</p>
+  <div class="tabs" id="tabs" role="group" aria-label="Level"></div>
+  <div class="board"><svg id="svg" viewBox="0 0 100 70" role="img" aria-label="Graph: tap vertices to add them to your list"></svg></div>
+  <div class="list" id="list" aria-live="polite"></div>
+  <div class="status info" id="status" role="status">Tap a vertex to add it to your list.</div>
+  <div class="controls">
+    <button id="undo">Undo</button>
+    <button id="restart">New start vertex</button>
+    <button id="hint" aria-pressed="false">Show hint</button>
+  </div>
+  <p class="rule">In symbols: find an ordering P<sub>1</sub>, P<sub>2</sub>, …, P<sub>n</sub> such that every P<sub>k</sub> is connected to at least one of P<sub>1</sub>, …, P<sub>k−1</sub>.</p>
+</main>
+<script>
+{
+const LET='ABCDEFGHIJKLMNOP';
+const LEVELS=[
+  {name:'Level 1',pos:[[18,20],[50,10],[82,20],[82,52],[50,62],[18,52]],
+   edges:[[0,1],[1,2],[2,3],[3,4],[4,5],[1,4]]},
+  {name:'Level 2',pos:[[12,35],[30,15],[30,55],[50,35],[68,15],[68,55],[88,15],[88,55]],
+   edges:[[0,1],[0,2],[1,3],[2,3],[3,4],[4,6],[3,5],[5,7]]},
+  {name:'Level 3',pos:[[71.7,52.9],[7.1,30.8],[86.8,9.3],[46.2,30.5],[26.7,54.8],[90.4,31.0],[8.8,9.2],[88.4,61.3],[5.5,56.9],[51.2,62.4],[28.7,11.1],[72.8,32.6],[72.3,11.1],[28.5,36.7]],
+   edges:[[1,12],[9,12],[0,4],[4,6],[7,9],[6,13],[8,10],[1,4],[3,9],[7,11],[9,10],[2,11],[0,5],[3,10]]}
+
+];
+const svg=document.getElementById('svg'),listEl=document.getElementById('list'),statusEl=document.getElementById('status'),tabsEl=document.getElementById('tabs');
+const btnUndo=document.getElementById('undo'),btnRestart=document.getElementById('restart'),btnHint=document.getElementById('hint');
+let solved=new Set();
+try{solved=new Set(JSON.parse(localStorage.getItem('ordering-solved')||'[]'))}catch(e){}
+let cur=0,G=null,adj=[],picks=[],hint=false,result=null;
+
+function load(level,keepGraph){
+  cur=level;
+  if(!keepGraph||!G) G=LEVELS[level];
+  const n=G.pos.length; adj=Array.from({length:n},()=>new Set());
+  for(const [a,b] of G.edges){adj[a].add(b);adj[b].add(a)}
+  picks=[Math.floor(Math.random()*n)]; result=null;
+  render();
+}
+function allowed(v){return !picks.includes(v)&&picks.some(p=>adj[v].has(p))}
+function check(){
+  for(let k=1;k<picks.length;k++){if(!picks.slice(0,k).some(p=>adj[picks[k]].has(p)))return {ok:false,k}}
+  return {ok:true};
+}
+function pick(v){
+  if(result&&result.ok)return;
+  if(picks.includes(v))return;
+  picks.push(v);
+  if(picks.length===G.pos.length){
+    result=check();
+    if(result.ok){solved.add(LEVELS[cur].name);try{localStorage.setItem('ordering-solved',JSON.stringify([...solved]))}catch(e){}}
+  }
+  render();
+}
+function renderTabs(){
+  tabsEl.innerHTML=LEVELS.map((L,i)=>`<button data-i="${i}" aria-pressed="${i===cur}">${L.name}${solved.has(L.name)?'<span class="tick" aria-label="solved">✓</span>':''}</button>`).join('');
+}
+function render(){
+  renderTabs();
+  const n=G.pos.length, bad=result&&!result.ok?picks[result.k]:-1;
+  let s='';
+  for(const [a,b] of G.edges){const [x1,y1]=G.pos[a],[x2,y2]=G.pos[b];s+=`<line class="edge" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`}
+  for(let v=0;v<n;v++){
+    const [x,y]=G.pos[v],idx=picks.indexOf(v);
+    const cls=['node',idx===0?'start':idx>0?'picked':'',hint&&allowed(v)?'hint':'',v===bad?'badpick':''].join(' ');
+    s+=`<g class="${cls}" data-v="${v}" tabindex="0" role="button" aria-label="Vertex ${LET[v]}${idx>=0?', position '+(idx+1):''}">`+
+       `<circle r="7.5" cx="${x}" cy="${y}" fill="transparent"/><circle class="dot" r="4.6" cx="${x}" cy="${y}"/><text x="${x}" y="${y}">${LET[v]}</text>`+
+       (idx>0?`<circle class="badge" r="2.4" cx="${x+4}" cy="${y-4}"/><text class="btxt" x="${x+4}" y="${y-4}">${idx+1}</text>`:'')+`</g>`;
+  }
+  svg.innerHTML=s;
+  listEl.innerHTML=picks.map((v,i)=>`<span class="chip${i===0?' first':''}${result&&!result.ok&&i===result.k?' bad':''}"><span class="pk">P<sub>${i+1}</sub></span><span class="col">:</span>${LET[v]}</span>`).join('<span class="sep">→</span>');
+  if(result&&result.ok){
+    statusEl.className='status ok';
+    statusEl.innerHTML=`<span>✓ Valid ordering! Every vertex is connected to one before it.</span>${cur<LEVELS.length-1?' <button id="next">Next level</button>':' <button id="again">Play again</button>'}`;
+  }else if(result){
+    const v=picks[result.k];
+    statusEl.className='status bad';
+    statusEl.innerHTML=`<span>Not quite: ${LET[v]} (P<sub>${result.k+1}</sub>) isn't connected to any vertex before it.</span> <button id="back">Go back to before ${LET[v]}</button>`;
+  }else{
+    statusEl.className='status info';
+    statusEl.textContent=picks.length===1?`Start: ${LET[picks[0]]}. Tap the next vertex.`:`${picks.length} of ${n} placed. Keep going.`;
+  }
+  btnUndo.disabled=picks.length<=1||(result&&result.ok);
+  btnHint.setAttribute('aria-pressed',String(hint));btnHint.textContent=hint?'Hide hint':'Show hint';
+}
+svg.addEventListener('click',e=>{const g=e.target.closest('.node');if(g)pick(+g.dataset.v)});
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('.node');if(g){e.preventDefault();pick(+g.dataset.v)}}});
+tabsEl.addEventListener('click',e=>{const b=e.target.closest('button');if(b){G=null;load(+b.dataset.i)}});
+btnUndo.addEventListener('click',()=>{if(picks.length>1){picks.pop();result=null;render()}});
+btnRestart.addEventListener('click',()=>load(cur,true));
+btnHint.addEventListener('click',()=>{hint=!hint;render()});
+statusEl.addEventListener('click',e=>{
+  if(e.target.id==='next'){G=null;load(Math.min(cur+1,LEVELS.length-1))}
+  if(e.target.id==='again'){load(cur,true)}
+  if(e.target.id==='back'){picks=picks.slice(0,result.k);result=null;render()}
+});
+load(0);
+}
+</script>
+</body>
+</html>
