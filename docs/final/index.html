@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The final puzzle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: the last puzzle of a maths colloquium; friendly, quick to grasp on a phone.
+   IDEA: the whole algorithm as four levels: order, toggle, then contract freely down to a canonical shape.
+   PICTURE: one graph per level, as large as the screen allows; the changed edges flash magenta after each move.
+   COLOUR and TYPE: Imperial navy and white with one magenta accent; Lexend throughout. Same look as Puzzles 1 and 2.
+   LAYOUT: title, level tabs, rules for this level, the board, status, controls, a short reference box. */
+:root{color-scheme:light dark;
+  --bg:light-dark(#ffffff,#0b0d2e);--ink:light-dark(#151633,#eef0ff);--muted:light-dark(#5d6080,#a9add6);
+  --navy:light-dark(#000080,#9fb0ff);--blue:light-dark(#0000cd,#7f93ff);--mag:#c71585;
+  --tint:light-dark(#e6ebff,#1a1f55);--card:light-dark(#f4f6ff,#131746);--edge:light-dark(#000080,#8fa0ff);
+  --vfill:light-dark(#ffffff,#1d2260);--ok:light-dark(#0b7a43,#58d68d);--bad:#c71585}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Lexend,system-ui,sans-serif;overflow-x:clip}
+main{max-width:900px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,14px) 40px}
+h1{font-size:clamp(26px,4.4vw,40px);line-height:1.05;margin:0 0 6px;color:var(--navy);text-wrap:balance}
+.lead{margin:0 0 12px;color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tabs button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:22px;border:2px solid var(--navy);background:transparent;color:var(--navy);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--navy);color:var(--bg)}
+.tabs .tick{color:var(--ok);margin-left:6px}.tabs button[aria-pressed=true] .tick{color:inherit}
+.rules{margin:0 0 12px;padding:12px 16px;border-radius:14px;background:var(--card)}
+.rules h2{font-size:18px;margin:0 0 4px;color:var(--navy)}
+.rules ol{margin:0;padding-left:1.3em}.rules li{margin:2px 0}.rules b{color:var(--navy)}
+.meter{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:0 2px 6px}
+.meter .goal{color:var(--muted);font-size:15px}
+.meter .taps{font-weight:700;color:var(--navy);font-size:20px}
+.board{background:var(--card);border-radius:20px;padding:clamp(8px,2vw,18px)}
+.board svg{display:block;width:100%;height:auto;max-height:64vh;touch-action:manipulation;overflow:visible}
+.e{stroke:var(--edge);stroke-width:.5;fill:none}
+.e.vlink{stroke-width:.4}
+.e.new{stroke:var(--mag);stroke-width:.75}
+.e.gone{stroke:var(--mag);stroke-width:.45;stroke-dasharray:1 1;opacity:.55}
+.v{cursor:pointer}
+.v .dot{fill:var(--vfill);stroke:var(--navy);stroke-width:.55;transition:fill .2s}
+.v .lab{font:600 3px Lexend,sans-serif;fill:var(--navy);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.v .sub{font:600 2.8px Lexend,sans-serif;fill:var(--muted);text-anchor:middle;pointer-events:none}
+.v.picked .dot{fill:#000080;stroke:#000080}.v.picked .lab{fill:#fff}
+.v.first .dot{fill:var(--mag);stroke:var(--mag)}.v.first .lab{fill:#fff}
+.v.badpick .dot{stroke:var(--bad);stroke-width:1.1}
+.v.lit .dot{fill:#fff}.v.lit .lab{fill:#000080}
+.v.dark .dot{fill:#000080;stroke:#000080}.v.dark .lab{fill:#fff}
+.v.vnew .dot{fill:var(--tint);stroke:var(--mag);stroke-width:.8}.v.vnew .lab{fill:var(--mag)}
+.v.vnew{cursor:default}
+.v.sel .dot{stroke:var(--mag);stroke-width:1.1}
+.v.cand .dot{stroke:var(--mag);stroke-dasharray:1 .7;stroke-width:.8}
+.badge{fill:var(--mag)}.btxt{font:700 2.2px Lexend,sans-serif;fill:#fff;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.v .flip{transform-box:fill-box;transform-origin:center}
+.v.pulse .flip{animation:pulse .35s ease-out}
+@keyframes pulse{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.v.nope .flip{animation:nope .3s}
+@keyframes nope{25%{transform:translateX(-.8px)}75%{transform:translateX(.8px)}}
+.v:focus{outline:none}.v:focus-visible .dot{stroke:var(--mag);stroke-width:1.1}
+.yv .face{stroke:var(--navy);stroke-width:.55}
+.yv.w .face{fill:#fff}.yv.b .face{fill:#000080;stroke:#000080}
+.yv .ring{stroke:var(--mag);stroke-width:.55;fill:none}
+.yv .num,.band{font:600 2.5px Lexend,sans-serif;fill:var(--muted);text-anchor:middle}
+.band{text-anchor:start;fill:var(--navy)}
+.yv .flip{transform-box:fill-box;transform-origin:center}
+.yv.pulse .flip{animation:pulse .35s ease-out}
+.ylink{stroke:var(--edge);stroke-width:.35;stroke-dasharray:1 .8;fill:none}
+@media (prefers-reduced-motion:reduce){.v.pulse .flip,.yv.pulse .flip,.v.nope .flip,.status.ok{animation:none}}
+.list{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:48px;margin:12px 0 0;padding:8px 10px;border:2px dashed var(--tint);border-radius:14px}
+.list[hidden]{display:none}
+.list .empty{color:var(--muted);font-size:14px}
+.chip{display:inline-block;padding:4px 10px;border-radius:10px;background:var(--tint);color:var(--navy);font-weight:700;white-space:nowrap;line-height:1.3}
+.chip sub{font-size:.7em;line-height:0}.chip .col{margin:0 4px 0 1px;opacity:.7}
+.chip.first{background:var(--mag);color:#fff}
+.chip.bad{outline:2px solid var(--bad);background:light-dark(#fde7f1,#3a1030)}
+.sep{color:var(--muted)}
+.status{min-height:56px;margin:12px 0 10px;padding:12px 14px;border-radius:14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.status.info{background:var(--card);color:var(--muted);font-weight:400}
+.status.ok{background:light-dark(#e3f7ec,#0f3324);color:var(--ok);animation:pop .35s ease-out}
+.status.warn{background:light-dark(#fde7f1,#3a1030);color:var(--bad)}
+@keyframes pop{from{transform:scale(.97);opacity:.4}to{transform:none;opacity:1}}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.controls button,.status button{font:600 15px Lexend,sans-serif;min-height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--tint);color:var(--navy);cursor:pointer}
+.status button{background:var(--blue);color:#fff}
+button:focus-visible{outline:3px solid var(--mag);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.ref{margin:14px 0 0;padding:12px 16px;border-radius:14px;background:var(--card)}
+.ref h2{font-size:17px;margin:0 0 4px;color:var(--navy)}
+.ref p{margin:0 0 6px}.ref ul{margin:0;padding-left:1.2em}.ref li{margin:2px 0}.ref b{color:var(--navy)}
+@media(max-width:600px){.controls button{flex:1 1 40%}}
+</style>
+</head>
+<body>
+<main>
+  <h1>The final puzzle</h1>
+  <p class="lead">Four levels, one per idea from the talk: order, toggle, then contract all the way down.</p>
+  <div class="tabs" id="tabs" role="group" aria-label="Level"></div>
+  <section class="rules" id="rules" aria-live="polite"></section>
+  <div class="meter"><span class="goal" id="goal"></span><span class="taps" id="count"></span></div>
+  <div class="board"><svg id="svg" viewBox="0 0 100 56" role="img" aria-label="Puzzle board"></svg></div>
+  <div class="list" id="list" aria-live="polite" hidden></div>
+  <div class="status info" id="status" role="status"></div>
+  <div class="controls">
+    <button id="undo">Undo</button>
+    <button id="restart">Restart level</button>
+  </div>
+  <section class="ref" id="ref"></section>
+</main>
+<script>
+{
+const LET='ABCDEFGHIJKLMNOP', SUB=k=>String(k).replace(/\d/g,d=>'₀₁₂₃₄₅₆₇₈₉'[d]);
+/* The bowtie graph (13 vertices, 1 bowtie): path A..J, bowtie K (on D,E) with L,M */
+const BOWPOS=(()=>{const p=[];for(let i=0;i<10;i++)p.push([6+i*9.78,11]);
+  const r1=(p[3][0]+p[4][0])/2;
+  p.push([r1,28],[r1-5,44],[r1+5,44]);return p})();
+const BOWE=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[3,10],[4,10],[10,11],[10,12],[11,12]];
+/* Level 3: the complete graph on 5 vertices (every pair connected), drawn as a pentagon */
+const HPOS=[[50.0, 6.0], [69.97, 20.51], [62.34, 43.99], [37.66, 43.99], [30.03, 20.51]];
+const HE=[[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+const LEVELS=[
+  {name:'Level 1',kind:'order',pos:BOWPOS,edges:BOWE,vb:[1,4.5,98,45],r:4.1},
+  {name:'Level 2',kind:'toggle',start:[1,0,0,1,0,0,0,0,1],min:9},
+  {name:'Level 3',kind:'contract',pos:HPOS,edges:HE,min:3,dim:15,vb:[18,0,64,50],r:4.6},
+  {name:'Level 4',kind:'contract',pos:BOWPOS,edges:BOWE,min:3,dim:91,vb:[1,2,98,48],r:4.1}
+];
+const svg=document.getElementById('svg'),tabsEl=document.getElementById('tabs'),rulesEl=document.getElementById('rules'),
+  goalEl=document.getElementById('goal'),countEl=document.getElementById('count'),statusEl=document.getElementById('status'),
+  listEl=document.getElementById('list'),refEl=document.getElementById('ref'),btnUndo=document.getElementById('undo'),btnRestart=document.getElementById('restart');
+let best={};try{best=JSON.parse(localStorage.getItem('final-best')||'{}')}catch(e){}
+function saveBest(){try{localStorage.setItem('final-best',JSON.stringify(best))}catch(e){}}
+
+/* ---------- graph helpers ---------- */
+const mk=(n,E)=>{const a=Array.from({length:n},()=>new Set());for(const [i,j] of E){a[i].add(j);a[j].add(i)}return a};
+const copy=a=>a.map(s=>new Set(s));
+function contract(a,t,p){ // t is replaced by the product of p and t: every other neighbour of p switches its edge with t
+  const gained=[],lost=[];
+  for(const v of [...a[p]]){ if(v===t)continue;
+    if(a[t].has(v)){a[t].delete(v);a[v].delete(t);lost.push(v)} else {a[t].add(v);a[v].add(t);gained.push(v)} }
+  return {gained,lost};
+}
+function connected(a){const seen=new Set([0]),st=[0];while(st.length){for(const w of a[st.pop()])if(!seen.has(w)){seen.add(w);st.push(w)}}return seen.size===a.length}
+function classify(a){
+  const n=a.length,E=a.reduce((s,x)=>s+x.size,0)/2;
+  if(!connected(a)||E!==n-1)return null;
+  const big=[...a.keys()].filter(i=>a[i].size>=3);
+  if(!big.length)return {kind:'A',nL:n,k:0};
+  if(big.length>1)return null;
+  const c=big[0],legs=[];
+  for(const s of a[c]){let L=1,prev=c,cur=s;
+    for(;;){const nx=[...a[cur]].filter(w=>w!==prev);if(!nx.length)break;prev=cur;cur=nx[0];L++}
+    legs.push(L)}
+  const ones=legs.filter(L=>L===1).length,long=legs.filter(L=>L>=2);
+  if(ones>=1&&long.length<=1)return {kind:'A',nL:2+(long[0]||0),k:ones-1};
+  if(!ones)return null;
+  const m=legs.filter(L=>L===2).length,rest=legs.filter(L=>L>2),k=ones-1;
+  if(!rest.length&&m>=2)return {kind:'B1',k,m};
+  if(rest.length===1&&rest[0]===4&&m>=1)return {kind:'B2',k,m};
+  if(rest.length===1&&rest[0]===3&&m>=1)return {kind:'B3',k,m};
+  return null;
+}
+function describe(c){
+  const pre=c.k?`2${c.k>1?'<sup>'+c.k+'</sup>':''}·`:'';
+  if(c.kind==='A'){const d=2**c.k*c.nL*(c.nL+1)/2;
+    return `Type A: a path of ${c.nL}${c.k?` with ${c.k} extra pendant${c.k>1?'s':''} on its second vertex`:''}. Lie algebra ${pre}𝔰𝔬(${c.nL+1}), dimension ${d}.`}
+  if(c.kind==='B1'){const D=2**(c.m+1);return `Type B1. Lie algebra ${pre}𝔰𝔭(${D}), dimension ${2**c.k*D*(D+1)/2}.`}
+  if(c.kind==='B2'){const D=2**(c.m+3);return `Type B2. Lie algebra ${pre}𝔰𝔬(${D}), dimension ${2**c.k*D*(D-1)/2}.`}
+  const D=2**(c.m+2);return `Type B3. Lie algebra ${pre}𝔰𝔲(${D}), dimension ${2**c.k*(D*D-1)}.`;
+}
+function layoutA(a){
+  const n=a.length,c=[...a.keys()].find(i=>a[i].size>=3);let path=[],pend=[];
+  if(c===undefined){let s=[...a.keys()].find(i=>a[i].size<=1),prev=-1;while(s!==undefined){path.push(s);const nx=[...a[s]].find(w=>w!==prev);prev=s;s=nx}}
+  else{const leaves=[...a[c]].filter(w=>a[w].size===1),longStart=[...a[c]].find(w=>a[w].size>1);
+    path=[leaves[0],c];pend=leaves.slice(1);let prev=c,s=longStart;
+    while(s!==undefined){path.push(s);const nx=[...a[s]].find(w=>w!==prev);prev=s;s=nx}}
+  const pos=Array(n),m=path.length,cols=m>9?Math.ceil(m/2):m,sp=Math.min(12,84/Math.max(cols-1,1));
+  const x0=50-sp*(cols-1)/2;
+  const rows=Math.ceil(m/cols),hgt=(rows-1)*22+(pend.length?18:0),[,vy,,vh]=L.vb,y0=vy+vh/2-hgt/2;
+  path.forEach((v,i)=>{const row=Math.floor(i/cols);let col=i%cols;if(row)col=cols-1-col;pos[v]=[x0+col*sp,y0+row*22]});
+  pend.forEach((v,j)=>{const [px,py]=pos[path[1]];pos[v]=[px+(j-(pend.length-1)/2)*sp,py+18]});
+  return pos;
+}
+/* draw an edge; bend it if a straight line would pass through another vertex */
+function edgeD(pos,i,j,R){
+  const [x1,y1]=pos[i],[x2,y2]=pos[j],dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;
+  const clear=f=>{for(let k=0;k<pos.length;k++){if(k===i||k===j)continue;
+      for(let s=1;s<20;s++){const t=s/20,[px,py]=f(t);if(Math.hypot(px-pos[k][0],py-pos[k][1])<R)return false}}return true};
+  if(clear(t=>[x1+dx*t,y1+dy*t]))return `M${x1} ${y1}L${x2} ${y2}`;
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  for(const off of [-6,6,-10,10,-14,14,-18,18]){const cx=mx+nx*off,cy=my+ny*off;
+    const f=t=>[(1-t)*(1-t)*x1+2*(1-t)*t*cx+t*t*x2,(1-t)*(1-t)*y1+2*(1-t)*t*cy+t*t*y2];
+    if(clear(f))return `M${x1} ${y1}Q${cx} ${cy} ${x2} ${y2}`}
+  return `M${x1} ${y1}Q${mx+nx*-20} ${my+ny*-20} ${x2} ${y2}`;
+}
+const ekey=(i,j)=>i<j?i+'-'+j:j+'-'+i;
+
+/* ---------- state ---------- */
+let cur=0,L=null,adj=[],hist=[],moves=0,done=false,msg='',warn=false,sel=-1,last=null,nope=-1;
+let picks=[],orderResult=null,y=[],yh=[],swapped=[],canon=null,showCanon=false;
+function load(i){
+  cur=i;L=LEVELS[i];hist=[];moves=0;done=false;msg='';warn=false;sel=-1;last=null;nope=-1;picks=[];orderResult=null;swapped=[];yh=[];canon=null;showCanon=false;
+  if(L.kind==='toggle'){const n=L.start.length,E=[];for(let k=0;k+1<n;k++)E.push([k,k+1]);
+    L.start.forEach((b,k)=>{if(b)E.push([n,k])});adj=mk(n+1,E);
+    y=[0];for(const b of L.start)y.push(y[y.length-1]^b);}
+  else adj=mk(L.pos.length,L.edges);
+  renderStatic();render();
+}
+function win(){
+  done=true; const prev=best[L.name];
+  if(prev===undefined||moves<prev){best[L.name]=moves;saveBest()}
+}
+
+/* ---------- moves ---------- */
+function tapOrder(v){
+  if(orderResult&&orderResult.ok)return;
+  if(picks.includes(v))return;
+  picks.push(v);
+  if(picks.length===adj.length){
+    let bad=-1;for(let k=1;k<picks.length&&bad<0;k++)if(!picks.slice(0,k).some(p=>adj[picks[k]].has(p)))bad=k;
+    orderResult=bad<0?{ok:true}:{ok:false,k:bad};
+    if(orderResult.ok){best[L.name]=0;saveBest();done=true}
+  }
+  render();
+}
+function tapToggle(i){
+  const V=adj.length-1;
+  if(done||i===V)return;
+  if(!adj[V].has(i)){nope=i;warn=true;msg=`P${SUB(i+1)} is dark, so it isn't connected to V. Tap a lit (white) vertex.`;last=null;swapped=[];render();nope=-1;return}
+  hist.push(copy(adj));yh.push(y.slice());
+  const ch=contract(adj,V,i);[y[i],y[i+1]]=[y[i+1],y[i]];swapped=[i,i+1];
+  moves++;warn=false;last={t:V,p:i,...ch};
+  if(adj[V].size===1)win();
+  msg=`Contracted P${SUB(i+1)} onto V: its neighbours flipped.`;
+  render();
+}
+function tapContract(v){
+  if(done)return;
+  if(sel<0||sel===v){sel=sel===v?-1:v;last=null;warn=false;msg='';render();return}
+  if(!adj[sel].has(v)){sel=v;last=null;warn=false;msg='';render();return}
+  hist.push(copy(adj));
+  const p=sel,t=v,ch=contract(adj,t,p);moves++;sel=-1;warn=false;last={t,p,...ch};
+  const part=[];
+  if(ch.lost.length)part.push(`lost ${ch.lost.map(w=>LET[w]).join(', ')}`);
+  if(ch.gained.length)part.push(`gained ${ch.gained.map(w=>LET[w]).join(', ')}`);
+  msg=`Contracted ${LET[p]} onto ${LET[t]}: ${LET[t]} ${part.length?part.join(' and '):'did not change'}.`;
+  const c=classify(adj);if(c){win();msg=describe(c);if(c.kind==='A')canon=layoutA(adj)}
+  render();
+}
+
+/* ---------- rendering ---------- */
+function renderStatic(){
+  tabsEl.innerHTML=LEVELS.map((l,i)=>`<button data-i="${i}" aria-pressed="${i===cur}">${l.name}${best[l.name]!==undefined?'<span class="tick" aria-label="solved">✓</span>':''}</button>`).join('');
+  const R={
+   order:`<h2>Level 1 · Build the ordering</h2><ol><li>Tap the vertices <b>one at a time</b> to build a list P<sub>1</sub>, P<sub>2</sub>, P<sub>3</sub>, …</li><li>Your first vertex can be anything. After that, every new vertex must be <b>connected</b> to at least one vertex already in the list.</li><li>When every vertex is in, we check your list.</li></ol>`,
+   toggle:`<h2>Level 2 · Contract onto V</h2><ol><li>The new vertex <b>V</b> is connected to the <b>lit</b> (white) vertices. Tap a lit vertex P to <b>contract P onto V</b>.</li><li>V changes: P's neighbours flip, lit ↔ dark. P itself stays lit.</li><li>You win when V is connected to <b>exactly one</b> vertex. Fewest contractions wins.</li></ol>`,
+   contract:`<h2>${L.name} · Contract to canonical form</h2><ol><li>Tap a vertex <b>p</b>, then one of its neighbours <b>t</b>. This contracts p <b>onto</b> t, and t is the vertex that changes.</li><li>Every other vertex connected to p switches its connection to t: connected ↔ not connected. p stays connected to t. Nothing else changes.</li><li>You win when the graph reaches a <b>canonical shape</b>. Fewest contractions wins.</li></ol>`};
+  rulesEl.innerHTML=R[L.kind];
+  const F={
+   order:`<h2>Why order first?</h2><p>We build the canonical form one vertex at a time. With this ordering, every new vertex P<sub>k</sub> arrives connected to the graph we've already built. Breadth-first search always gives one.</p><p style="margin:0">This is the graph from Level 4. Get to know it.</p>`,
+   toggle:`<h2>The y space</h2><p>Under the path is a second row y<sub>0</sub>, y<sub>1</sub>, …, y<sub>n</sub>, starting from y<sub>0</sub> = 0 (dark).</p><ul><li>Swapping y<sub>i−1</sub> and y<sub>i</sub> is legal only if they are <b>unequal</b> (one dark, one white).</li><li>That swap is the same as contracting the lit vertex P<sub>i</sub> onto V.</li></ul><p style="margin:6px 0 0">Use this row to find the fewest contractions.</p>`,
+   contract:`<h2>Canonical shapes</h2><ul><li><b>Type A</b>: a path, with any number of extra pendants on its second vertex.</li><li><b>Type B</b>: a star whose legs have length 1 and 2 (at least one of each), plus at most one leg of length 3 or 4.</li></ul><p style="margin:6px 0 0">Contractions never change the Lie algebra, so its dimension stays at ${L.dim} the whole time.</p>`};
+  refEl.innerHTML=F[L.kind];
+  listEl.hidden=L.kind!=='order';
+  btnRestart.textContent=L.kind==='order'?'Clear list':'Restart level';
+}
+function render(){
+  renderStatic();
+  if(L.kind==='toggle')renderToggle();else renderGraph();
+  const b=best[L.name];
+  if(L.kind==='order'){
+    goalEl.textContent=`${picks.length} of ${adj.length} in your list`;countEl.textContent='';
+    listEl.innerHTML=picks.length?picks.map((v,i)=>`<span class="chip${i===0?' first':''}${orderResult&&!orderResult.ok&&i===orderResult.k?' bad':''}">P<sub>${i+1}</sub><span class="col">:</span>${LET[v]}</span>`).join('<span class="sep">→</span>'):'<span class="empty">Your list appears here.</span>';
+    if(orderResult&&orderResult.ok){statusEl.className='status ok';statusEl.innerHTML=`<span>✓ Valid ordering! Every vertex is connected to one before it.</span> <button data-act="next">Next level</button>`}
+    else if(orderResult){const v=picks[orderResult.k];statusEl.className='status warn';statusEl.innerHTML=`<span>Not quite: ${LET[v]} (P<sub>${orderResult.k+1}</sub>) isn't connected to any vertex before it.</span> <button data-act="back">Go back to before ${LET[v]}</button>`}
+    else{statusEl.className='status info';statusEl.textContent=picks.length?'Keep going: tap the next vertex.':'Tap any vertex to start your list.'}
+    btnUndo.disabled=!picks.length||(orderResult&&orderResult.ok);return;
+  }
+  countEl.textContent=`Contractions: ${moves}`;
+  if(L.kind==='toggle'){const V=adj.length-1;goalEl.textContent=`V has ${adj[V].size} neighbour${adj[V].size===1?'':'s'} · goal: exactly 1`}
+  else goalEl.textContent=`Lie algebra dimension ${L.dim} · goal: a canonical shape`;
+  if(done){
+    statusEl.className='status ok';
+    const extra=moves===L.min?'That is the minimum!':`The minimum is ${L.min}. Can you match it?`;
+    const head=L.kind==='toggle'?`✓ V now has exactly one neighbour, in ${moves} contractions.`:`✓ Canonical in ${moves} contractions. ${msg}`;
+    statusEl.innerHTML=`<span>${head} ${extra}</span> ${canon?`<button data-act="canon">${showCanon?'Back to the original layout':'Show canonical shape'}</button>`:''}${moves>L.min?'<button data-act="retry">Try again</button>':''}${cur<LEVELS.length-1?'<button data-act="next">Next level</button>':''}`;
+  }else if(warn){statusEl.className='status warn';statusEl.textContent=msg}
+  else{statusEl.className='status info';
+    if(L.kind==='contract'&&sel>=0)statusEl.textContent=`Selected ${LET[sel]}. Now tap one of its neighbours (dashed) to contract ${LET[sel]} onto it. That neighbour changes. Tap ${LET[sel]} again to cancel.`;
+    else statusEl.textContent=msg||(L.kind==='toggle'?'Tap a lit vertex to contract it onto V.':'Tap a vertex p, then a neighbour t, to contract p onto t.');}
+  btnUndo.disabled=!hist.length||done;
+}
+function renderGraph(){
+  const pos=showCanon&&canon?canon:L.pos,n=pos.length,r=L.r,R=r+1,[vx,vy,vw,vh]=L.vb;
+  svg.setAttribute('viewBox',`${vx} ${vy} ${vw} ${vh}`);
+  const changed=new Set();if(last&&!showCanon){for(const w of [...last.gained,...last.lost])changed.add(ekey(last.t,w))}
+  let s='';
+  for(let i=0;i<n;i++)for(const j of adj[i])if(i<j)s+=`<path class="e${changed.has(ekey(i,j))?' new':''}" d="${edgeD(pos,i,j,R)}"/>`;
+  if(last&&!showCanon)for(const w of last.lost)s+=`<path class="e gone" d="${edgeD(pos,last.t,w,R)}"/>`;
+  const bad=orderResult&&!orderResult.ok?picks[orderResult.k]:-1;
+  for(let v=0;v<n;v++){
+    const [x,yy]=pos[v],idx=picks.indexOf(v);
+    const cls=['v',L.kind==='order'&&idx===0?'first':'',L.kind==='order'&&idx>0?'picked':'',v===bad?'badpick':'',
+      sel===v?'sel':'',sel>=0&&adj[sel].has(v)?'cand':'',last&&last.t===v?'pulse':''].join(' ');
+    s+=`<g class="${cls}" data-v="${v}" tabindex="0" role="button" aria-label="Vertex ${LET[v]}${idx>=0?', P'+(idx+1):''}">`+
+       `<circle r="${r+1.4}" cx="${x}" cy="${yy}" fill="transparent"/><g class="flip"><circle class="dot" r="${r}" cx="${x}" cy="${yy}"/></g>`+
+       `<text class="lab" x="${x}" y="${yy}" style="font-size:${r*.85}px">${LET[v]}</text>`+
+       (L.kind==='order'&&idx>=0?`<circle class="badge" r="1.9" cx="${x+r*.85}" cy="${yy-r*.85}"/><text class="btxt" x="${x+r*.85}" y="${yy-r*.85}">${idx+1}</text>`:'')+`</g>`;
+  }
+  svg.innerHTML=s;
+}
+function renderToggle(){
+  const n=adj.length-1,V=n,P=10,X=i=>10+i*P,PY=27,VY=8,YY=45,r=3.6;
+  svg.setAttribute('viewBox',`3 1 94 54`);
+  let s='';
+  for(let i=0;i+1<n;i++)s+=`<line class="e" x1="${X(i)}" y1="${PY}" x2="${X(i+1)}" y2="${PY}"/>`;
+  const changed=new Set(last?[...last.gained,...last.lost]:[]);
+  for(const i of adj[V])s+=`<line class="e vlink${changed.has(i)?' new':''}" x1="50" y1="${VY}" x2="${X(i)}" y2="${PY}"/>`;
+  if(last)for(const i of last.lost)s+=`<line class="e gone" x1="50" y1="${VY}" x2="${X(i)}" y2="${PY}"/>`;
+  s+=`<g class="v vnew${last?' pulse':''}" aria-label="V, the new vertex"><g class="flip"><circle class="dot" r="${r}" cx="50" cy="${VY}"/></g><text class="lab" x="50" y="${VY}">V</text></g>`;
+  for(let i=0;i<n;i++){const lit=adj[V].has(i);
+    s+=`<g class="v ${lit?'lit':'dark'}${nope===i?' nope':''}${changed.has(i)?' pulse':''}" data-v="${i}" tabindex="0" role="button" aria-label="P${i+1}, ${lit?'lit':'dark'}">`+
+       `<rect x="${X(i)-P/2}" y="${PY-6}" width="${P}" height="12" fill="transparent"/>`+
+       `<g class="flip"><circle class="dot" r="${r}" cx="${X(i)}" cy="${PY}"/></g><text class="sub" x="${X(i)}" y="${PY+r+3}">P${SUB(i+1)}</text></g>`;}
+  s+=`<text class="band" x="1" y="${YY-r-2}">y space</text>`;
+  for(let j=0;j<n;j++)s+=`<line class="ylink" x1="${X(j)-P/2}" y1="${YY}" x2="${X(j)+P/2}" y2="${YY}"/>`;
+  for(let j=0;j<=n;j++){const cx=X(j)-P/2,h=r*.92,w=y[j]===1,sw=swapped.includes(j);
+    s+=`<g class="yv ${w?'w':'b'}${sw?' pulse':''}" aria-hidden="true">`+(sw&&!done?`<rect class="ring" x="${cx-h-1.1}" y="${YY-h-1.1}" width="${2*h+2.2}" height="${2*h+2.2}" rx="1.6"/>`:'')+
+       `<g class="flip"><rect class="face" x="${cx-h}" y="${YY-h}" width="${2*h}" height="${2*h}" rx="1"/></g><text class="num" x="${cx}" y="${YY+r+3}">y${SUB(j)}</text></g>`;}
+  svg.innerHTML=s;
+}
+
+/* ---------- events ---------- */
+function act(v){if(L.kind==='order')tapOrder(v);else if(L.kind==='toggle')tapToggle(v);else tapContract(v)}
+svg.addEventListener('click',e=>{const g=e.target.closest('[data-v]');if(g)act(+g.dataset.v)});
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('[data-v]');if(g){e.preventDefault();act(+g.dataset.v)}}});
+tabsEl.addEventListener('click',e=>{const b=e.target.closest('button');if(b)load(+b.dataset.i)});
+btnUndo.addEventListener('click',()=>{
+  if(L.kind==='order'){if(picks.length){picks.pop();orderResult=null;render()}return}
+  if(hist.length&&!done){adj=hist.pop();if(L.kind==='toggle')y=yh.pop();moves--;last=null;sel=-1;swapped=[];msg='';warn=false;render()}
+});
+btnRestart.addEventListener('click',()=>load(cur));
+statusEl.addEventListener('click',e=>{const a=e.target.dataset&&e.target.dataset.act;
+  if(a==='next')load(Math.min(cur+1,LEVELS.length-1));
+  if(a==='retry')load(cur);
+  if(a==='canon'){showCanon=!showCanon;render()}
+  if(a==='back'){picks=picks.slice(0,orderResult.k);orderResult=null;render()}});
+load(0);
+}
+</script>
+</body>
+</html>
